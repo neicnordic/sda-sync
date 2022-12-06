@@ -76,11 +76,7 @@ services:
 
   s3_proxy:
     profiles: ["sda-sweden"]
-    build:
-      context: ../
-      args:
-        GOLANG_VERSION: ${GOLANG_VERSION:-1.19}
-    image: neicnordic/sda-inbox-s3proxy
+    image: neicnordic/sda-s3proxy
     container_name: proxy
     depends_on:
       cegamq:
@@ -93,7 +89,7 @@ services:
       - AWS_URL=http://s3:9000
       - AWS_ACCESSKEY=access
       - AWS_SECRETKEY=secretkey
-      - AWS_BUCKET=test
+      - AWS_BUCKET=inbox
       - AWS_REGION=us-east-1
       - AWS_READYPATH=/minio/health/ready
       #- AWS_CACERT=/certs/ca.crt
@@ -438,53 +434,6 @@ services:
       /usr/bin/mc -q mb s3/backup || true;
       exit 0;
       "
-
-  # s3_proxyfin:
-  #   profiles: ["sda-finland"]
-  #   build:
-  #     context: ../
-  #     args:
-  #       GOLANG_VERSION: ${GOLANG_VERSION:-1.19}
-  #   image: neicnordic/sda-inbox-s3proxy
-  #   container_name: proxyfin
-  #   depends_on:
-  #     cegamqfin:
-  #       condition: service_healthy
-  #     s3fin:
-  #       condition: service_healthy
-  #   restart: always
-  #   environment:
-  #     - LOG_LEVEL=info
-  #     - AWS_URL=http://s3fin:9000
-  #     - AWS_ACCESSKEY=access
-  #     - AWS_SECRETKEY=secretkey
-  #     - AWS_BUCKET=test
-  #     - AWS_REGION=us-east-1
-  #     - AWS_READYPATH=/minio/health/ready
-  #     #- AWS_CACERT=/certs/ca.crt
-  #     - BROKER_HOST=cegamqfin
-  #     - BROKER_USER=test
-  #     - BROKER_PASSWORD=test
-  #     - BROKER_PORT=5672
-  #     - BROKER_VHOST=/lega
-  #     - BROKER_EXCHANGE=localega.v1
-  #     - BROKER_ROUTINGKEY=files.inbox
-  #     - BROKER_SSL=false
-  #     #- BROKER_CACERT=/certs/ca.crt
-  #     - BROKER_CLIENTCERT=/certs/client.crt
-  #     - BROKER_CLIENTKEY=/certs/client.key
-  #     - BROKER_VERIFYPEER=false
-  #     #- SERVER_CERT=/certs/proxy.crt
-  #     #- SERVER_KEY=/certs/proxy.key
-  #     - SERVER_JWTPUBKEYPATH=/keys/
-  #     - SERVER_JWTPUBEYURL=https://login.elixir-czech.org/oidc/jwk
-  #     - LOG_FORMAT=json
-  #   volumes:
-  #     #- proxy_certs:/certs
-  #     - ./keys:/keys
-  #   ports:
-  #     - "8002:8000"
-  #     - "8003:8001"
 
   ingestfin:
     profiles: ["sda-finland"]
