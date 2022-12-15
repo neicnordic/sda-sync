@@ -1,0 +1,90 @@
+archive:
+  type: ""
+  # S3 backend
+  url: "http://localhost"
+  port: 9000
+  accesskey: "access"
+  secretkey: "secretkey"
+  bucket: "archive"
+  chunksize: 32
+  # posix backend
+  location: "/tmp"
+
+backup:
+  type: ""
+  # S3 backend
+  url: "http://localhost"
+  port: 9000
+  accesskey: "access"
+  secretkey: "secretkey"
+  bucket: "inbox"
+  chunksize: 5
+  # posix backend
+  location: "dev_utils"
+  copyHeader: "true"
+   # sftp backend
+  sftp:
+    host: "localhost"
+    port: "6222"
+    userName: "user"
+    pemKeyPath: "/keys-sftp/sftp-key.pem"
+    pemKeyPass: "test"
+
+broker:
+  host: "localhost"
+  port: 5672
+  user: "test"
+  password: "test"
+  vhost: "test"
+  queue: "error"
+  exchange: "sda"
+  routingKey: ""
+  routingError: ""
+  ssl: "false"
+  verifyPeer: "false"
+  clientCert: "test"
+  clientKey: "test"
+
+c4gh:
+  passphrase: "repoPass"
+  filepath: "/keys/repo.sec.pem"
+  backupPubKey: "/keys/finnish-repo.pub.pem"
+
+db:
+  host: "localhost"
+  port: 5432
+  user: "lega_in"
+  password: "lega_in"
+  database: "lega"
+  sslmode: "disable"
+
+inbox:
+  type: ""
+  # S3 backend
+  url: "http://s3"
+  port: 9000
+  accesskey: "access"
+  secretkey: "secretkey"
+  bucket: "inbox"
+  chunksize: 32
+  # posix backend
+  location: "dev_utils"
+
+aws:
+  url: "https://localhost:9000"
+  readypath: "/minio/health/ready"
+  accessKey: "ElixirID"
+  secretKey: "987654321"
+  bucket: "test"
+  region: "us-east-1"
+  #cacert: "/certs/ca.crt"
+
+log:
+  level: "debug"
+  format: "json"
+
+sync:
+  host: "http://syncapifin"
+  port: "8080"
+  password: "pass"
+  user: "dummy"
