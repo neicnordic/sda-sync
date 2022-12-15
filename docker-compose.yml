@@ -76,7 +76,7 @@ services:
 
   s3_proxy:
     profiles: ["sda-sweden"]
-    image: neicnordic/sda-s3proxy
+    image: neicnordic/sda-s3proxy:v0.1.139
     container_name: proxy
     depends_on:
       cegamq:
