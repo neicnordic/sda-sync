@@ -1,33 +1,46 @@
-version: "3.9"
 services:
-  db:
+  # credentials:
+  #   container_name: credentials
+  #   command:
+  #     - "/bin/sh"
+  #     - "/scripts/make_sda_credentials.sh"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     rabbitmq:
+  #       condition: service_healthy
+  #   environment:
+  #     - PGPASSWORD=rootpasswd
+  #   image: python:3.10-slim
+  #   volumes:
+  #     - ./scripts:/scripts
+  #     - shared:/shared
+  postgres:
     profiles: ["sda-sweden"]
-    command: server /data
-    container_name: db
+    container_name: postgres
+    # command: server /data
     environment:
-      - DB_LEGA_IN_PASSWORD=lega_in
-      - DB_LEGA_OUT_PASSWORD=lega_out
       - NOTLS=true
-      - POSTGRES_PASSWORD=rootpass
+      - POSTGRES_PASSWORD=rootpasswd
     healthcheck:
-      test: ["CMD", "pg_isready", "-h", "localhost", "-U", "lega_out"]
-      interval: 5s
-      timeout: 20s
-      retries: 3
-    image: neicnordic/sda-db:v2.0.0
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 2s
+      retries: 6
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}-postgres
     ports:
       - "5432:5432"
     volumes:
       - dbdata:/var/lib/postgresql/data
 
-  mq:
+  rabbitmq:
     profiles: ["sda-sweden"]
-    image: neicnordic/sda-mq:sync-v0.0.1
-    container_name: mq
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}-rabbitmq
+    container_name: rabbitmq
     environment:
      - CEGA_CONNECTION=amqp://test:test@cegamq:5672/lega
-     - MQ_USER=test
-     - MQ_PASSWORD_HASH=C5ufXbYlww6ZBcEqDUB04YdUptO81s+ozI3Ll5GCHTnv8NAm
+     - RABBITMQ_DEFAULT_PASS=test
+     - RABBITMQ_DEFAULT_USER=test
      - MQ_VHOST=test
      - NOTLS=true
     ports:
@@ -74,10 +87,11 @@ services:
       exit 0;
       "
 
-  s3_proxy:
+  s3inbox:
     profiles: ["sda-sweden"]
-    image: neicnordic/sda-s3proxy:v0.1.139
-    container_name: proxy
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    command: [ sda-s3inbox ]
+    container_name: s3inbox
     depends_on:
       cegamq:
         condition: service_healthy
@@ -86,13 +100,13 @@ services:
     restart: always
     environment:
       - LOG_LEVEL=info
-      - AWS_URL=http://s3:9000
-      - AWS_ACCESSKEY=access
-      - AWS_SECRETKEY=secretkey
-      - AWS_BUCKET=inbox
-      - AWS_REGION=us-east-1
-      - AWS_READYPATH=/minio/health/ready
-      #- AWS_CACERT=/certs/ca.crt
+      - INBOX_URL=http://s3:9000
+      - INBOX_ACCESSKEY=access
+      - INBOX_SECRETKEY=secretkey
+      - INBOX_BUCKET=inbox
+      - INBOX_REGION=us-east-1
+      - INBOX_READYPATH=/minio/health/ready
+      #- INBOX_CACERT=/certs/ca.crt
       - BROKER_HOST=cegamq
       - BROKER_USER=test
       - BROKER_PASSWORD=test
@@ -119,12 +133,11 @@ services:
 
   ingest:
     profiles: ["sda-sweden"]
-    command: sda-ingest
     container_name: ingest
     depends_on:
-      db:
+      postgres:
         condition: service_started
-      mq:
+      rabbitmq:
         condition: service_healthy
       s3:
         condition: service_started
@@ -134,14 +147,15 @@ services:
       - ARCHIVE_TYPE=s3
       - ARCHIVE_URL=http://s3
       - BROKER_EXCHANGE=sda
-      - BROKER_HOST=mq
+      - BROKER_HOST=rabbitmq
       - BROKER_QUEUE=ingest
       - BROKER_ROUTINGKEY=archived
       - BROKER_ROUTINGERROR=error
-      - DB_HOST=db
+      - DB_HOST=postgres
       - INBOX_TYPE=s3
       - INBOX_URL=http://s3
-    image: neicnordic/sda-pipeline:sync-ingest-v0.0.1
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    command: [ sda-ingest ]
     volumes:
       - ./config.yaml:/config.yaml
       - keys:/keys
@@ -150,12 +164,13 @@ services:
 
   verify:
     profiles: ["sda-sweden"]
-    command: sda-verify
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    command: [ sda-verify ]
     container_name: verify
     depends_on:
-      db:
+      postgres:
         condition: service_started
-      mq:
+      rabbitmq:
         condition: service_healthy
       s3:
         condition: service_started
@@ -163,14 +178,13 @@ services:
       - ARCHIVE_URL=http://s3
       - ARCHIVE_TYPE=s3
       - BROKER_EXCHANGE=sda
-      - BROKER_HOST=mq
+      - BROKER_HOST=rabbitmq
       - BROKER_QUEUE=archived
       - BROKER_ROUTINGKEY=verified
       - BROKER_ROUTINGERROR=error
-      - DB_HOST=db
+      - DB_HOST=postgres
       - INBOX_TYPE=s3
       - INBOX_URL=http://s3
-    image: neicnordic/sda-pipeline:latest
     volumes:
       - ./config.yaml:/config.yaml
       - keys:/keys
@@ -179,78 +193,84 @@ services:
 
   finalize:
     profiles: ["sda-sweden"]
-    command: sda-finalize
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    command: [ sda-finalize ]
     container_name: finalize
     depends_on:
-      db:
+      postgres:
         condition: service_started
-      mq:
+      rabbitmq:
         condition: service_healthy
     environment:
       - BROKER_EXCHANGE=sda
-      - BROKER_HOST=mq
-      - BROKER_QUEUE=accessionIDs
-      - BROKER_ROUTINGKEY=backup
+      - BROKER_HOST=rabbitmq
+      - BROKER_QUEUE=accession
+      - BROKER_ROUTINGKEY=completed
       - BROKER_ROUTINGERROR=error
-      - DB_HOST=db
-    image: neicnordic/sda-pipeline:sync-finalize-v0.0.1
+      - DB_HOST=postgres
     volumes:
       - ./config.yaml:/config.yaml
       - keys:/keys
     restart: always
 
-  backup:
+  sync:
     profiles: ["sda-sweden"]
-    command: sda-backup
-    container_name: backup
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    command: [ sda-sync ]
+    container_name: sync
     depends_on:
-      db:
+      postgres:
         condition: service_started
-      mq:
+      rabbitmq:
         condition: service_healthy
       s3:
         condition: service_started
     environment:
-      - BACKUP_SFTP_HOST=sftp-serverfin
-      - BACKUP_SFTP_PORT=22
       - ARCHIVE_TYPE=s3
       - ARCHIVE_URL=http://s3
-      - BACKUP_TYPE=sftp
-      - BACKUP_URL=http://s3fin
-      - BACKUP_LOCATION=/backup
       - BROKER_EXCHANGE=sda
-      - BROKER_HOST=mq
-      - BROKER_QUEUE=backup
-      - BROKER_ROUTINGKEY=completed
-      - BROKER_ROUTINGERROR=error
-      - DB_HOST=db
-    image: neicnordic/sda-pipeline:sync-backup-v0.0.1
+      - BROKER_HOST=rabbitmq
+      - BROKER_QUEUE=mapping_stream
+      - DB_HOST=postgres
     volumes:
       - ./config.yaml:/config.yaml
       - keys:/keys
       - archive:/tmp
-      - backup:/backup
-      - ./keys-sftp:/keys-sftp
     restart: always
+
+  sync-api:
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    command: [ sda-syncapi ]
+    container_name: sync-api
+    depends_on:
+      credentials:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - BROKER_EXCHANGE=sda.dead
+    ports:
+      - "18080:8080"
+    restart: always
+    volumes:
+      - ./sda/config.yaml:/config.yaml
 
   mapper:
     profiles: ["sda-sweden"]
-    command: sda-mapper
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    command: [ sda-mapper ]
     container_name: mapper
     depends_on:
-      db:
+      postgres:
         condition: service_started
-      mq:
+      rabbitmq:
         condition: service_healthy
     environment:
       - BROKER_EXCHANGE=sda
-      - BROKER_HOST=mq
+      - BROKER_HOST=rabbitmq
       - BROKER_QUEUE=mappings
       - BROKER_ROUTINGERROR=error
-      - DB_HOST=db
-      - DB_USER=lega_out
-      - DB_PASSWORD=lega_out
-    image: neicnordic/sda-pipeline:sync-mapper-v0.0.1
+      - DB_HOST=postgres
     volumes:
       - ./config.yaml:/config.yaml
       - keys:/keys
@@ -258,42 +278,21 @@ services:
 
   interceptor:
     profiles: ["sda-sweden"]
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
     command: sda-intercept
     depends_on:
-      mq:
+      rabbitmq:
         condition: service_healthy
     environment:
       - BROKER_EXCHANGE=sda
-      - BROKER_HOST=mq
+      - BROKER_HOST=rabbitmq
       - BROKER_QUEUE=files
       - BROKER_ROUTINGKEY=ingest
       - BROKER_ROUTINGERROR=error
-    image: neicnordic/sda-pipeline:latest
     volumes:
       - ./config.yaml:/config.yaml
       - keys:/keys
     restart: always
-
-  syncapi:
-    profiles: ["sda-sweden"]
-    command: sda-syncapi
-    container_name: syncapi
-    depends_on:
-      - db
-      - mq
-    environment:
-      - BROKER_EXCHANGE=sda
-      - BROKER_HOST=mq
-      - BROKER_ROUTINGKEY=sync
-      - BROKER_ROUTINGERROR=error
-      - BROKER_QUEUE=sync
-      - DB_HOST=db
-    image: neicnordic/sda-pipeline:sync-api-v0.0.1
-    ports:
-      - "8080:8080"
-    restart: always
-    volumes:
-      - ./config.yaml:/config.yaml
 
   bootstrap:
     profiles: ["sda-sweden"]
@@ -307,7 +306,7 @@ services:
     volumes:
       - $PWD/scripts/bootstrap.sh:/bin/bootstrap.sh
       - keys:/keys
-  
+
   cegamq:
     profiles: ["sda-sweden"]
     container_name: cegamq
@@ -345,19 +344,19 @@ services:
 # Finnish implementation
   dbfin:
     profiles: ["sda-finland"]
-    command: server /data
+    # command: server /data
     container_name: dbfin
     environment:
-      - DB_LEGA_IN_PASSWORD=lega_in
-      - DB_LEGA_OUT_PASSWORD=lega_out
+      # - DB_LEGA_IN_PASSWORD=lega_in
+      # - DB_LEGA_OUT_PASSWORD=lega_out
       - NOTLS=true
-      - POSTGRES_PASSWORD=rootpass
+      - POSTGRES_PASSWORD=rootpasswd
     healthcheck:
-      test: ["CMD", "pg_isready", "-h", "localhost", "-U", "lega_out"]
-      interval: 5s
-      timeout: 20s
-      retries: 3
-    image: neicnordic/sda-db:v2.0.0
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 2s
+      retries: 6
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}-postgres
     ports:
       - "5431:5432"
     volumes:
@@ -365,12 +364,12 @@ services:
 
   mqfin:
     profiles: ["sda-finland"]
-    image: neicnordic/sda-mq:sync-v0.0.1
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}-rabbitmq
     container_name: mqfin
     environment:
      - CEGA_CONNECTION=amqp://test:test@cegamqfin:5672/lega
-     - MQ_USER=test
-     - MQ_PASSWORD_HASH=C5ufXbYlww6ZBcEqDUB04YdUptO81s+ozI3Ll5GCHTnv8NAm
+     - RABBITMQ_DEFAULT_PASS=test
+     - RABBITMQ_DEFAULT_USER=test
      - MQ_VHOST=test
      - NOTLS=true
     ports:
@@ -381,24 +380,6 @@ services:
       interval: 5s
       timeout: 120s
       retries: 10
-
-  sftp-serverfin:
-    profiles: ["sda-finland"]
-    build:
-        context: dev_utils/sftp-server
-    hostname: sftp-serv
-    environment:
-      - SFTP_USER=user
-      - SFTP_USER_PASS=user
-      - DELETE_UPLOADED_FILES=false
-      - FILE_CHECK_INTERVAL=0
-      - FILE_AGE=0.01 #minutes
-    container_name: sftp-server
-    ports:
-        - "6222:22"
-    volumes:
-        - uploadsfin:/uploads
-        - ./keys-sftp:/keys
 
   s3fin:
     profiles: ["sda-finland"]
@@ -431,23 +412,20 @@ services:
       /usr/bin/mc -q config host add s3 http://s3fin:9000 access secretkey;
       /usr/bin/mc -q mb s3/inbox || true;
       /usr/bin/mc -q mb s3/archive || true;
-      /usr/bin/mc -q mb s3/backup || true;
+      /usr/bin/mc -q mb s3/sync || true;
       exit 0;
       "
 
   ingestfin:
     profiles: ["sda-finland"]
-    command: sda-ingest
     container_name: ingestfin
     depends_on:
       dbfin:
         condition: service_started
       mqfin:
         condition: service_healthy
-      #s3fin:
-      #  condition: service_started
-      sftp-serverfin:
-        condition: service_started
+      s3fin:
+       condition: service_started
       bootstrapfin:
         condition: service_started
     environment:
@@ -459,12 +437,11 @@ services:
       - BROKER_ROUTINGKEY=archived
       - BROKER_ROUTINGERROR=error
       - DB_HOST=dbfin
-      - INBOX_TYPE=POSIX
-      - INBOX_LOCATION=/uploads/user/upload
-      #- INBOX_URL=http://s3fin
-    image: neicnordic/sda-pipeline:sync-ingest-v0.0.1
+      - INBOX_TYPE=s3
+      - INBOX_URL=http://s3fin
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    command: [ sda-ingest ]
     volumes:
-      - uploadsfin:/uploads
       - ./configfin.yaml:/config.yaml
       - keys:/keys
       - archivefin:/tmp
