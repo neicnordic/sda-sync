@@ -1,7 +1,7 @@
 archive:
-  type: ""
+  type: "s3"
   # S3 backend
-  url: "http://localhost"
+  url: "http://s3"
   port: 9000
   accesskey: "access"
   secretkey: "secretkey"
@@ -11,31 +11,31 @@ archive:
   location: "/tmp"
 
 backup:
-  type: ""
+  type: "s3"
   # S3 backend
-  url: "http://localhost"
+  url: "http://s3"
   port: 9000
   accesskey: "access"
   secretkey: "secretkey"
   bucket: "inbox"
   chunksize: 5
   # posix backend
-  location: "dev_utils"
-  copyHeader: "true"
-   # sftp backend
-  sftp:
-    host: "localhost"
-    port: "6222"
-    userName: "user"
-    pemKeyPath: "/keys-sftp/sftp-key.pem"
-    pemKeyPass: "test"
+  #location: "dev_utils"
+  #copyHeader: "true"
+  #  # sftp backend
+  # sftp:
+  #   host: "localhost"
+  #   port: "6222"
+  #   userName: "user"
+  #   pemKeyPath: "/keys-sftp/sftp-key.pem"
+  #   pemKeyPass: "test"
 
 broker:
-  host: "localhost"
+  host: "rabbitmq"
   port: 5672
   user: "test"
   password: "test"
-  vhost: "test"
+  vhost: "sda"
   queue: "error"
   exchange: "sda"
   routingKey: ""
@@ -51,7 +51,7 @@ c4gh:
   syncPubKeyPath: "/keys/finnish-repo.pub.pem"
 
 db:
-  host: "localhost"
+  host: "postgres"
   port: 5432
   user: "postgres"
   password: "rootpasswd"
@@ -59,7 +59,7 @@ db:
   sslmode: "disable"
 
 inbox:
-  type: ""
+  type: "s3"
   # S3 backend
   url: "http://s3"
   port: 9000
@@ -68,16 +68,7 @@ inbox:
   bucket: "inbox"
   chunksize: 32
   # posix backend
-  location: "dev_utils"
-
-aws:
-  url: "https://localhost:9000"
-  readypath: "/minio/health/ready"
-  accessKey: "ElixirID"
-  secretKey: "987654321"
-  bucket: "test"
-  region: "us-east-1"
-  #cacert: "/certs/ca.crt"
+  #location: "dev_utils"
 
 log:
   level: "debug"
@@ -96,15 +87,15 @@ sync:
   centerPrefix: "SYNC"
   destination:
     type: "s3"
-    url: "http://s3"
+    url: "http://s3fin"
     port: 9000
     readypath: "/minio/health/ready"
     accessKey: "access"
-    secretKey: "secretKey"
+    secretKey: "secretkey"
     bucket: "sync"
     region: "us-east-1"
   remote:
-    host: "http://sync-api"
-    port: "8080"
+    host: "http://sync-apifin"
+    port: "8090"
     password: "pass"
     user: "user"

@@ -1,3 +1,6 @@
+# TODO: Credentials container is required by sync-api. Do we need it?
+# TODO: Ports for the sync-api
+
 services:
   # credentials:
   #   container_name: credentials
@@ -18,10 +21,9 @@ services:
   postgres:
     profiles: ["sda-sweden"]
     container_name: postgres
-    # command: server /data
     environment:
-      - NOTLS=true
       - POSTGRES_PASSWORD=rootpasswd
+      # - DB_SSLMODE=disable
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -41,8 +43,8 @@ services:
      - CEGA_CONNECTION=amqp://test:test@cegamq:5672/lega
      - RABBITMQ_DEFAULT_PASS=test
      - RABBITMQ_DEFAULT_USER=test
-     - MQ_VHOST=test
-     - NOTLS=true
+     - MQ_VHOST=sda
+     # - NOTLS=true
     ports:
       - "15672:15672"
       - "5672:5672"
@@ -57,14 +59,20 @@ services:
     command: server /data --console-address ":9001"
     container_name: s3
     environment:
-      - MINIO_ACCESS_KEY=access
-      - MINIO_SECRET_KEY=secretkey
+      - MINIO_ROOT_USER=access
+      - MINIO_ROOT_PASSWORD=secretkey
       - MINIO_SERVER_URL=http://127.0.0.1:9000
     healthcheck:
-      test: ["CMD", "curl", "-fq", "http://localhost:9000/minio/health/live"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-fqI",
+          "http://localhost:9000/minio/health/live"
+        ]
       interval: 5s
       timeout: 20s
-      retries: 3
+      retries: 10
     image: minio/minio
     ports:
       - "9000:9000"
@@ -96,11 +104,13 @@ services:
       cegamq:
         condition: service_healthy
       s3:
+        condition: service_started
+      postgres:
         condition: service_healthy
     restart: always
     environment:
-      - LOG_LEVEL=info
-      - INBOX_URL=http://s3:9000
+      - LOG_LEVEL=debug
+      - INBOX_URL=http://s3
       - INBOX_ACCESSKEY=access
       - INBOX_SECRETKEY=secretkey
       - INBOX_BUCKET=inbox
@@ -111,20 +121,26 @@ services:
       - BROKER_USER=test
       - BROKER_PASSWORD=test
       - BROKER_PORT=5672
-      - BROKER_VHOST=/lega
+      - BROKER_VHOST=lega
       - BROKER_EXCHANGE=localega.v1
-      - BROKER_ROUTINGKEY=files.inbox
+      - BROKER_ROUTINGKEY=inbox
       - BROKER_SSL=false
       #- BROKER_CACERT=/certs/ca.crt
       - BROKER_CLIENTCERT=/certs/client.crt
       - BROKER_CLIENTKEY=/certs/client.key
       - BROKER_VERIFYPEER=false
+      - DB_PASSWORD=rootpasswd
+      - DB_USER=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_SSLMODE=disable
       #- SERVER_CERT=/certs/proxy.crt
       #- SERVER_KEY=/certs/proxy.key
       - SERVER_JWTPUBKEYPATH=/keys/
-      - SERVER_JWTPUBEYURL=https://login.elixir-czech.org/oidc/jwk
+      - SERVER_JWTPUBKEYURL=https://login.elixir-czech.org/oidc/jwk
       - LOG_FORMAT=json
     volumes:
+      - ./config.yaml:/config.yaml
       #- proxy_certs:/certs
       - ./keys:/keys
     ports:
@@ -239,12 +255,13 @@ services:
     restart: always
 
   sync-api:
+    profiles: ["sda-sweden"]
     image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
     command: [ sda-syncapi ]
     container_name: sync-api
     depends_on:
-      credentials:
-        condition: service_completed_successfully
+      # credentials:
+      #   condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
     environment:
@@ -253,7 +270,7 @@ services:
       - "18080:8080"
     restart: always
     volumes:
-      - ./sda/config.yaml:/config.yaml
+      - ./config.yaml:/config.yaml
 
   mapper:
     profiles: ["sda-sweden"]
@@ -278,15 +295,16 @@ services:
 
   interceptor:
     profiles: ["sda-sweden"]
+    container_name: interceptor
     image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
     command: sda-intercept
     depends_on:
       rabbitmq:
         condition: service_healthy
     environment:
-      - BROKER_EXCHANGE=sda
+      #- BROKER_EXCHANGE=lega
       - BROKER_HOST=rabbitmq
-      - BROKER_QUEUE=files
+      - BROKER_QUEUE=from_cega
       - BROKER_ROUTINGKEY=ingest
       - BROKER_ROUTINGERROR=error
     volumes:
@@ -342,14 +360,10 @@ services:
     image: mock-cega
 
 # Finnish implementation
-  dbfin:
+  postgresfin:
     profiles: ["sda-finland"]
-    # command: server /data
-    container_name: dbfin
+    container_name: postgresfin
     environment:
-      # - DB_LEGA_IN_PASSWORD=lega_in
-      # - DB_LEGA_OUT_PASSWORD=lega_out
-      - NOTLS=true
       - POSTGRES_PASSWORD=rootpasswd
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -362,15 +376,15 @@ services:
     volumes:
       - dbdatafin:/var/lib/postgresql/data
 
-  mqfin:
+  rabbitmqfin:
     profiles: ["sda-finland"]
     image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}-rabbitmq
-    container_name: mqfin
+    container_name: rabbitmqfin
     environment:
      - CEGA_CONNECTION=amqp://test:test@cegamqfin:5672/lega
      - RABBITMQ_DEFAULT_PASS=test
      - RABBITMQ_DEFAULT_USER=test
-     - MQ_VHOST=test
+     - MQ_VHOST=sda
      - NOTLS=true
     ports:
       - "15674:15672"
@@ -386,8 +400,8 @@ services:
     command: server /data --console-address ":9001"
     container_name: s3fin
     environment:
-      - MINIO_ACCESS_KEY=access
-      - MINIO_SECRET_KEY=secretkey
+      - MINIO_ROOT_USER=access
+      - MINIO_ROOT_PASSWORD=secretkey
       - MINIO_SERVER_URL=http://127.0.0.1:9000
     healthcheck:
       test: ["CMD", "curl", "-fq", "http://localhost:9000/minio/health/live"]
@@ -420,9 +434,9 @@ services:
     profiles: ["sda-finland"]
     container_name: ingestfin
     depends_on:
-      dbfin:
+      postgresfin:
         condition: service_started
-      mqfin:
+      rabbitmqfin:
         condition: service_healthy
       s3fin:
        condition: service_started
@@ -432,11 +446,11 @@ services:
       - ARCHIVE_TYPE=s3
       - ARCHIVE_URL=http://s3fin
       - BROKER_EXCHANGE=sda
-      - BROKER_HOST=mqfin
+      - BROKER_HOST=rabbitmqfin
       - BROKER_QUEUE=ingest
       - BROKER_ROUTINGKEY=archived
       - BROKER_ROUTINGERROR=error
-      - DB_HOST=dbfin
+      - DB_HOST=postgresfin
       - INBOX_TYPE=s3
       - INBOX_URL=http://s3fin
     image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
@@ -452,26 +466,24 @@ services:
     command: sda-verify
     container_name: verifyfin
     depends_on:
-      dbfin:
+      postgresfin:
         condition: service_started
-      mqfin:
+      rabbitmqfin:
         condition: service_healthy
-      #s3fin:
-      #  condition: service_started
-      sftp-serverfin:
+      s3fin:
         condition: service_started
     environment:
       - ARCHIVE_URL=http://s3fin
       - ARCHIVE_TYPE=s3
       - BROKER_EXCHANGE=sda
-      - BROKER_HOST=mqfin
+      - BROKER_HOST=rabbitmqfin
       - BROKER_QUEUE=archived
       - BROKER_ROUTINGKEY=verified
       - BROKER_ROUTINGERROR=error
-      - DB_HOST=dbfin
+      - DB_HOST=postgresfin
       - INBOX_TYPE=s3
       - INBOX_URL=http://s3fin
-    image: neicnordic/sda-pipeline:latest
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
     volumes:
       - ./configfin.yaml:/config.yaml
       - keys:/keys
@@ -483,112 +495,101 @@ services:
     command: sda-finalize
     container_name: finalizefin
     depends_on:
-      dbfin:
+      postgresfin:
         condition: service_started
-      mqfin:
+      rabbitmqfin:
         condition: service_healthy
     environment:
       - BROKER_EXCHANGE=sda
-      - BROKER_HOST=mqfin
-      - BROKER_QUEUE=accessionIDs
-      - BROKER_ROUTINGKEY=backup
+      - BROKER_HOST=rabbitmqfin
+      - BROKER_QUEUE=accession
+      - BROKER_ROUTINGKEY=completed
       - BROKER_ROUTINGERROR=error
-      - DB_HOST=dbfin
-    image: neicnordic/sda-pipeline:sync-finalize-v0.0.1
+      - DB_HOST=postgresfin
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
     volumes:
       - ./configfin.yaml:/config.yaml
       - keys:/keys
     restart: always
 
-  backupfin:
+  syncfin:
     profiles: ["sda-finland"]
-    command: sda-backup
-    container_name: backupfin
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    command: [ sda-sync ]
+    container_name: syncfin
     depends_on:
-      dbfin:
+      postgresfin:
         condition: service_started
-      mqfin:
+      rabbitmqfin:
         condition: service_healthy
-      #s3fin:
-      #  condition: service_started
-      sftp-serverfin:
+      s3fin:
         condition: service_started
     environment:
       - ARCHIVE_TYPE=s3
       - ARCHIVE_URL=http://s3fin
-      - BACKUP_TYPE=s3
-      - BACKUP_URL=http://s3fin
-      - BACKUP_LOCATION=/backup
       - BROKER_EXCHANGE=sda
-      - BROKER_HOST=mqfin
-      - BROKER_QUEUE=backup
-      - BROKER_ROUTINGKEY=completed
-      - BROKER_ROUTINGERROR=error
-      - DB_HOST=dbfin
-    image: neicnordic/sda-pipeline:sync-finalize-v0.0.1
+      - BROKER_HOST=rabbitmqfin
+      - BROKER_QUEUE=mapping_stream
+      - DB_HOST=postgresfin
     volumes:
       - ./configfin.yaml:/config.yaml
       - keys:/keys
       - archivefin:/tmp
-      - backupfin:/backup
     restart: always
 
-  mapperfin:
+  sync-apifin:
     profiles: ["sda-finland"]
-    command: sda-mapper
-    container_name: mapperfin
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    command: [ sda-syncapi ]
+    container_name: sync-apifin
     depends_on:
-      dbfin:
-        condition: service_started
-      mqfin:
+      # credentials:
+      #   condition: service_completed_successfully
+      rabbitmqfin:
         condition: service_healthy
     environment:
-      - BROKER_EXCHANGE=sda
-      - BROKER_HOST=mqfin
-      - BROKER_QUEUE=mappings
-      - BROKER_ROUTINGERROR=error
-      - DB_HOST=dbfin
-      - DB_USER=lega_out
-      - DB_PASSWORD=lega_out
-    image: neicnordic/sda-pipeline:sync-mapper-v0.0.1
-    volumes:
-      - ./configfin.yaml:/config.yaml
-      - keys:/keys
-    restart: always
-
-  syncapifin:
-    profiles: ["sda-finland"]
-    command: sda-syncapi
-    container_name: syncapifin
-    depends_on:
-      - dbfin
-      - mqfin
-    environment:
-      - BROKER_EXCHANGE=sda
-      - BROKER_HOST=mqfin
-      - BROKER_ROUTINGKEY=sync
-      - BROKER_ROUTINGERROR=error
-      - DB_HOST=dbfin
-    image: neicnordic/sda-pipeline:sync-api-v0.0.1
+      - BROKER_EXCHANGE=sda.dead
     ports:
       - "8090:8080"
     restart: always
     volumes:
       - ./configfin.yaml:/config.yaml
 
-  interceptorfin:
+  mapperfin:
     profiles: ["sda-finland"]
-    command: sda-intercept
+    command: sda-mapper
+    container_name: mapperfin
     depends_on:
-      mqfin:
+      postgresfin:
+        condition: service_started
+      rabbitmqfin:
         condition: service_healthy
     environment:
       - BROKER_EXCHANGE=sda
-      - BROKER_HOST=mqfin
-      - BROKER_QUEUE=files
+      - BROKER_HOST=rabbitmqfin
+      - BROKER_QUEUE=mappings
+      - BROKER_ROUTINGERROR=error
+      - DB_HOST=postgresfin
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    volumes:
+      - ./configfin.yaml:/config.yaml
+      - keys:/keys
+    restart: always
+
+  interceptorfin:
+    profiles: ["sda-finland"]
+    command: sda-intercept
+    container_name: interceptorfin
+    depends_on:
+      rabbitmqfin:
+        condition: service_healthy
+    environment:
+      # - BROKER_EXCHANGE=lega
+      - BROKER_HOST=rabbitmqfin
+      - BROKER_QUEUE=from_cega
       - BROKER_ROUTINGKEY=ingest
       - BROKER_ROUTINGERROR=error
-    image: neicnordic/sda-pipeline:latest
+    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
     volumes:
       - ./configfin.yaml:/config.yaml
       - keys:/keys
