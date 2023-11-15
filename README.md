@@ -27,7 +27,7 @@ Login to LS-AAI and get the token that will be used for uploading data. For exam
 
 The next step is to encrypt and upload the file in the `s3Inbox` of the Swedish node, using the sda-cli downloadable [here](https://github.com/NBISweden/sda-cli/releases) (and available under the `tools` folder), running:
 ```sh
-./sda-cli upload -encrypt-with-key ../keys/repo.pub.pem tools/file.test
+./sda-cli upload --config proxyS3 -encrypt-with-key keys/repo.pub.pem tools/file.test
 ```
 
 ## Ingest the file
