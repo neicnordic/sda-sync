@@ -58,7 +58,7 @@ inbox:
   port: 9000
   accesskey: "access"
   secretkey: "secretkey"
-  bucket: "inbox"
+  bucket: "sync"
   chunksize: 32
   # posix backend
   #location: "dev_utils"
@@ -66,12 +66,6 @@ inbox:
 log:
   level: "debug"
   format: "json"
-
-
-# sync:
-#   host: "http://localhost:9090"
-#   password: "pass"
-#   user: "dummy"
 
 sync:
   api:
@@ -89,6 +83,8 @@ sync:
     region: "us-east-1"
   remote:
     host: "http://sync-api"
-    port: "18080"
+    port: "8080"
     password: "pass"
     user: "user"
+
+schema.type: "isolated"

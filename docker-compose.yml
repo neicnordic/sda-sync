@@ -1,29 +1,9 @@
-# TODO: Credentials container is required by sync-api. Do we need it?
-# TODO: Ports for the sync-api
-
 services:
-  # credentials:
-  #   container_name: credentials
-  #   command:
-  #     - "/bin/sh"
-  #     - "/scripts/make_sda_credentials.sh"
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     rabbitmq:
-  #       condition: service_healthy
-  #   environment:
-  #     - PGPASSWORD=rootpasswd
-  #   image: python:3.10-slim
-  #   volumes:
-  #     - ./scripts:/scripts
-  #     - shared:/shared
   postgres:
     profiles: ["sda-sweden"]
     container_name: postgres
     environment:
       - POSTGRES_PASSWORD=rootpasswd
-      # - DB_SSLMODE=disable
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -40,11 +20,9 @@ services:
     image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}-rabbitmq
     container_name: rabbitmq
     environment:
-     - CEGA_CONNECTION=amqp://test:test@cegamq:5672/lega
      - RABBITMQ_DEFAULT_PASS=test
      - RABBITMQ_DEFAULT_USER=test
      - MQ_VHOST=sda
-     # - NOTLS=true
     ports:
       - "15672:15672"
       - "5672:5672"
@@ -101,8 +79,6 @@ services:
     command: [ sda-s3inbox ]
     container_name: s3inbox
     depends_on:
-      cegamq:
-        condition: service_healthy
       s3:
         condition: service_started
       postgres:
@@ -116,16 +92,14 @@ services:
       - INBOX_BUCKET=inbox
       - INBOX_REGION=us-east-1
       - INBOX_READYPATH=/minio/health/ready
-      #- INBOX_CACERT=/certs/ca.crt
-      - BROKER_HOST=cegamq
+      - BROKER_HOST=rabbitmq
       - BROKER_USER=test
       - BROKER_PASSWORD=test
       - BROKER_PORT=5672
-      - BROKER_VHOST=lega
-      - BROKER_EXCHANGE=localega.v1
+      - BROKER_VHOST=sda
+      - BROKER_EXCHANGE=sda
       - BROKER_ROUTINGKEY=inbox
       - BROKER_SSL=false
-      #- BROKER_CACERT=/certs/ca.crt
       - BROKER_CLIENTCERT=/certs/client.crt
       - BROKER_CLIENTKEY=/certs/client.key
       - BROKER_VERIFYPEER=false
@@ -134,14 +108,11 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_SSLMODE=disable
-      #- SERVER_CERT=/certs/proxy.crt
-      #- SERVER_KEY=/certs/proxy.key
       - SERVER_JWTPUBKEYPATH=/keys/
       - SERVER_JWTPUBKEYURL=https://login.elixir-czech.org/oidc/jwk
       - LOG_FORMAT=json
     volumes:
       - ./config.yaml:/config.yaml
-      #- proxy_certs:/certs
       - ./keys:/keys
     ports:
       - "8000:8000"
@@ -260,12 +231,13 @@ services:
     command: [ sda-syncapi ]
     container_name: sync-api
     depends_on:
-      # credentials:
-      #   condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
     environment:
-      - BROKER_EXCHANGE=sda.dead
+      - BROKER_EXCHANGE=sda
+      - SYNC_API_INGESTROUTING=ingest
+      - SYNC_API_ACCESSIONROUTING=accession
+      - SYNC_API_MAPPINGROUTING=mappings
     ports:
       - "18080:8080"
     restart: always
@@ -293,25 +265,6 @@ services:
       - keys:/keys
     restart: always
 
-  interceptor:
-    profiles: ["sda-sweden"]
-    container_name: interceptor
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
-    command: sda-intercept
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    environment:
-      #- BROKER_EXCHANGE=lega
-      - BROKER_HOST=rabbitmq
-      - BROKER_QUEUE=from_cega
-      - BROKER_ROUTINGKEY=ingest
-      - BROKER_ROUTINGERROR=error
-    volumes:
-      - ./config.yaml:/config.yaml
-      - keys:/keys
-    restart: always
-
   bootstrap:
     profiles: ["sda-sweden"]
     depends_on:
@@ -324,40 +277,6 @@ services:
     volumes:
       - $PWD/scripts/bootstrap.sh:/bin/bootstrap.sh
       - keys:/keys
-
-  cegamq:
-    profiles: ["sda-sweden"]
-    container_name: cegamq
-    image: rabbitmq:3.11.2-management-alpine
-    environment:
-      - RABBITMQ_CONFIG_FILE=/etc/rabbitmq/conf/cega
-      - RABBITMQ_ENABLED_PLUGINS_FILE=/etc/rabbitmq/conf/cega.plugins
-    ports:
-      - "15673:15671"
-    volumes:
-      - ./mock-cega:/etc/rabbitmq/conf
-    restart: always
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "bash",
-          "-c",
-          "rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms"
-        ]
-      interval: 5s
-      timeout: 120s
-      retries: 10
-
-  mockcega:
-    profiles: ["sda-sweden"]
-    container_name: moce
-    depends_on:
-      cegamq:
-        condition: service_healthy
-    build:
-      dockerfile: ./mock-cega/Dockerfile
-    image: mock-cega
 
 # Finnish implementation
   postgresfin:
@@ -381,7 +300,6 @@ services:
     image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}-rabbitmq
     container_name: rabbitmqfin
     environment:
-     - CEGA_CONNECTION=amqp://test:test@cegamqfin:5672/lega
      - RABBITMQ_DEFAULT_PASS=test
      - RABBITMQ_DEFAULT_USER=test
      - MQ_VHOST=sda
@@ -543,12 +461,13 @@ services:
     command: [ sda-syncapi ]
     container_name: sync-apifin
     depends_on:
-      # credentials:
-      #   condition: service_completed_successfully
       rabbitmqfin:
         condition: service_healthy
     environment:
-      - BROKER_EXCHANGE=sda.dead
+      - BROKER_EXCHANGE=sda
+      - SYNC_API_INGESTROUTING=ingest
+      - SYNC_API_ACCESSIONROUTING=accession
+      - SYNC_API_MAPPINGROUTING=mappings
     ports:
       - "8090:8080"
     restart: always
@@ -576,30 +495,8 @@ services:
       - keys:/keys
     restart: always
 
-  interceptorfin:
-    profiles: ["sda-finland"]
-    command: sda-intercept
-    container_name: interceptorfin
-    depends_on:
-      rabbitmqfin:
-        condition: service_healthy
-    environment:
-      # - BROKER_EXCHANGE=lega
-      - BROKER_HOST=rabbitmqfin
-      - BROKER_QUEUE=from_cega
-      - BROKER_ROUTINGKEY=ingest
-      - BROKER_ROUTINGERROR=error
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
-    volumes:
-      - ./configfin.yaml:/config.yaml
-      - keys:/keys
-    restart: always
-
   bootstrapfin:
     profiles: ["sda-finland"]
-    # depends_on:
-      #createbucketfin:
-      #  condition: service_completed_successfully
     command: sh -c /bin/bootstrap.sh -p /keys/c4gh.pub
     container_name: bsfin
     image: neicnordic/sda-helm-tests-support:latest
@@ -607,40 +504,6 @@ services:
     volumes:
       - $PWD/scripts/bootstrap.sh:/bin/bootstrap.sh
       - keys:/keys
-  
-  cegamqfin:
-    profiles: ["sda-finland"]
-    container_name: cegamqfin
-    image: rabbitmq:3.11.2-management-alpine
-    environment:
-      - RABBITMQ_CONFIG_FILE=/etc/rabbitmq/conf/cega
-      - RABBITMQ_ENABLED_PLUGINS_FILE=/etc/rabbitmq/conf/cega.plugins
-    ports:
-      - "15675:15671"
-    volumes:
-      - ./mock-cegafin:/etc/rabbitmq/conf
-    restart: always
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "bash",
-          "-c",
-          "rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms"
-        ]
-      interval: 5s
-      timeout: 20s
-      retries: 3
-  
-  mockcegafin:
-    profiles: ["sda-finland"]
-    container_name: mocefin
-    depends_on:
-      cegamqfin:
-        condition: service_healthy
-    build:
-      dockerfile: ./mock-cegafin/Dockerfile
-    image: mock-cegafin
 
 volumes:
   keys:
