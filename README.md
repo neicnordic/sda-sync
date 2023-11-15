@@ -53,7 +53,7 @@ To give an accession id to this file, run the following command, replacing the `
 ```
 
 Finally, to create a dataset including this file, run the following command, replacing the `<USER-ELIXIR-ID>` and the `<DATASET-ID>`.
-**NOTE:** The `<DATASET-ID>` should have the `centerPrefix` defined under `config.yaml`:
+**NOTE:** The `<DATASET-ID>` should have the `centerPrefix` defined under `config.yaml` and it should be minimum 11 characters long:
 ```sh
 ./sda-admin --mq-queue-prefix sda --user `<USER-ELIXIR-ID>` dataset `<DATASET-ID>` file.test.c4gh
 ```
