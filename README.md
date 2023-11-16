@@ -9,7 +9,7 @@ In brief, the syncing will be triggered whenever a local dataset submission, i.e
 
 The `sync-api` service will be triggered whenever it receives a RabbitMQ message from the `sync` service of the other node. The `sync-api` service will then create the RabbitMQ messages needed to trigger the ingestion cycle on the receiving node.
 
-The example integration in the `docker-compose.yml` assummes that both nodes are running inboxes that are S3 based but POSIX and sftp inbox types are also supported and may be configured.
+The example integration in the `docker-compose.yml` assummes that both nodes are running inboxes that are S3 based but POSIX and sftp inbox types are also supported and may be configured by uncommenting the noted code segments of the compose file.
 
 ## How to run the integration
 

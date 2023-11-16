@@ -166,9 +166,19 @@ services:
         condition: service_started
     environment:
       - BROKER_QUEUE=mapping_stream
+    # uncomment for sftp inbox
+      # - SYNC_DESTINATION_TYPE=sftp
+      # - SYNC_DESTINATION_SFTP_HOST=sftp-serverfin
+      # - SYNC_DESTINATION_SFTP_PORT=22
+      # - SYNC_DESTINATION_SFTP_USERNAME=user
+      # - SYNC_DESTINATION_SFTP_HOSTKEY=
+      # - SYNC_DESTINATION_SFTP_PEMKEYPATH=/keys-sftp/sftp-key.pem
+      # - SYNC_DESTINATION_SFTP_PEMKEYPASS=test
     volumes:
       - ./config.yaml:/config.yaml
       - keys:/keys
+    # uncomment for sftp inbox
+      # - ./keys-sftp:/keys-sftp
     restart: always
 
   sync-api:
@@ -219,7 +229,7 @@ services:
       - $PWD/scripts/bootstrap.sh:/bin/bootstrap.sh
       - keys:/keys
 
-# Finnish implementation (assumming an s3 inbox)
+# Finnish implementation
   postgresfin:
     profiles: ["sda-finland"]
     container_name: postgresfin
@@ -252,6 +262,26 @@ services:
       interval: 5s
       timeout: 120s
       retries: 10
+
+# uncomment for sftp inbox
+  # sftp-serverfin:
+  #   profiles: ["sda-finland"]
+  #   build:
+  #       context: dev_utils/sftp-server
+  #   hostname: sftp-serv
+  #   environment:
+  #     - SFTP_USER=user
+  #     - SFTP_USER_PASS=user
+  #     - DELETE_UPLOADED_FILES=false
+  #     - FILE_CHECK_INTERVAL=0
+  #     - FILE_AGE=0.01 #minutes
+  #     - SFTP_USER_PUB_KEY=/keys/sftp-key.pub
+  #   container_name: sftp-server
+  #   ports:
+  #       - "6222:22"
+  #   volumes:
+  #       - inboxfin:/uploads
+  #       - ./keys-sftp:/keys
 
   s3fin:
     profiles: ["sda-finland"]
@@ -297,19 +327,26 @@ services:
       rabbitmqfin:
         condition: service_healthy
       s3fin:
-       condition: service_started
+        condition: service_started
+    # uncomment for sftp inbox
+      # sftp-serverfin:
+      #   condition: service_started
       bootstrapfin:
         condition: service_started
     environment:
+    # uncomment for sftp inbox
+      # - INBOX_TYPE=posix
+      # - INBOX_LOCATION=/uploads/user/upload
       - BROKER_QUEUE=ingest
       - BROKER_ROUTINGKEY=archived
     image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}
     command: [ sda-ingest ]
     volumes:
+    # uncomment for sftp inbox
+      # - inboxfin:/uploads
       - ./configfin.yaml:/config.yaml
       - keys:/keys
     # uncomment if using POSIX filesystem
-      # - inboxfin:/tmp
       # - archivefin:/tmp
     restart: always
 
@@ -324,6 +361,9 @@ services:
         condition: service_healthy
       s3fin:
         condition: service_started
+    # uncomment for sftp inbox
+      # sftp-serverfin:
+      #   condition: service_started
     environment:
       - BROKER_QUEUE=archived
       - BROKER_ROUTINGKEY=verified
@@ -332,7 +372,6 @@ services:
       - ./configfin.yaml:/config.yaml
       - keys:/keys
     # uncomment if using POSIX filesystem
-      # - inboxfin:/tmp
       # - archivefin:/tmp
     restart: always
 
@@ -352,6 +391,9 @@ services:
     volumes:
       - ./configfin.yaml:/config.yaml
       - keys:/keys
+    # uncomment if using POSIX filesystem
+      # - archivefin:/tmp
+      # - backupfin:/tmp
     restart: always
 
   syncfin:
