@@ -1,6 +1,15 @@
 # SDA-sync
 
-The sda-sync is an integration created to solve the sync issue in BigPicture. In this project, the files (and datasets) that are uploaded in one node, should be synced/backed up in another and the ingestion process should be run on both sides. However, the accession and dataset IDs should be the same in both nodes. Therefore, the integration is taking advantage of the sda-pipeline `sync` and `sync-api` services in order to send the required data and create the messages needed on the receiving side of the syncing.
+The sda-sync is an integration created to solve the *data* syncing requirement in BigPicture. In this project, every data submission that takes place in a country's node must be *mirrored* in the other country's node. This means that both the submitted data files and their corresponding database identifiers (e.g. accession and dataset ID's) in one country's node should be replicated in the other country's node. This is achieved by syncing the data between the two nodes.
+
+
+Specifically, the files (and datasets) that are uploaded in one node, are synced/backed up to the other node by making sure that the ingestion process that is run on both sides will result in accession and dataset IDs that are the same in both nodes. To achieve this, the sync integration utilizes the sensitive-data-archive `sync` and `sync-api` services.
+
+In brief, the syncing will be triggered whenever a local dataset submission, i.e. a dataset that is created on the local node, is detected. The detection is based on the dataset prefix which is unique to each country's node. In such a case, the `sync` service copies the dataset files to the inbox of the other node after these have been re-encrypted with the recipient nodes's crypt4gh public key. It also posts JSON messages to the receiving node's `sync-api` service from which `sync-api` creates and sends the necessary RabbitMQ messages to orchestrate the ingestion cycle on the receiving side of the syncing.
+
+The `sync-api` service will be triggered whenever it receives a RabbitMQ message from the `sync` service of the other node. The `sync-api` service will then create the RabbitMQ messages needed to trigger the ingestion cycle on the receiving node.
+
+The example integration in the `docker-compose.yml` assummes that both nodes are running inboxes that are S3 based but POSIX and sftp inbox types are also supported and may be configured.
 
 ## How to run the integration
 
@@ -15,6 +24,8 @@ Start the services in Finland
 docker compose --profile sda-finland up
 ```
 
+**Note:** the version of the `sensitive-date-archive` services for the whole stack can be changed by editing the `.env` file that is located in the root of the repo.
+
 ## Encrypt and upload files
 
 There is a script under the `dev_utils` folder that cleans up the files folder and exports the keys for encryption. Running the script should download the crypt4gh keys that would allow for encrypting the `file.test` included in the `dev_utils/tools` folder
@@ -27,7 +38,7 @@ Login to LS-AAI and get the token that will be used for uploading data. For exam
 
 The next step is to encrypt and upload the file in the `s3Inbox` of the Swedish node, using the sda-cli downloadable [here](https://github.com/NBISweden/sda-cli/releases) (and available under the `tools` folder), running:
 ```sh
-./sda-cli upload --config proxyS3 -encrypt-with-key keys/repo.pub.pem tools/file.test
+./sda-cli upload --config ../proxyS3 -encrypt-with-key ../keys/repo.pub.pem file.test
 ```
 
 ## Ingest the file
