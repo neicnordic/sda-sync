@@ -8,7 +8,7 @@ archive:
   bucket: "archive"
   chunksize: 32
   # posix backend
-  location: "/tmp"
+  # location: "/tmp"
 
 backup:
   type: "s3"
@@ -20,8 +20,7 @@ backup:
   bucket: "backup"
   chunksize: 5
   # posix backend
-  #location: "dev_utils"
-  #copyHeader: "true"
+  # location: "/tmp"
 
 broker:
   host: "rabbitmqfin"
@@ -61,7 +60,7 @@ inbox:
   bucket: "sync"
   chunksize: 32
   # posix backend
-  #location: "dev_utils"
+  #location: "/tmp"
 
 log:
   level: "debug"

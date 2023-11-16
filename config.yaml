@@ -7,8 +7,6 @@ archive:
   secretkey: "secretkey"
   bucket: "archive"
   chunksize: 32
-  # posix backend
-  location: "/tmp"
 
 backup:
   type: "s3"
@@ -19,16 +17,6 @@ backup:
   secretkey: "secretkey"
   bucket: "backup"
   chunksize: 5
-  # posix backend
-  #location: "dev_utils"
-  #copyHeader: "true"
-  #  # sftp backend
-  # sftp:
-  #   host: "localhost"
-  #   port: "6222"
-  #   userName: "user"
-  #   pemKeyPath: "/keys-sftp/sftp-key.pem"
-  #   pemKeyPass: "test"
 
 broker:
   host: "rabbitmq"
@@ -67,8 +55,8 @@ inbox:
   secretkey: "secretkey"
   bucket: "inbox"
   chunksize: 32
-  # posix backend
-  #location: "dev_utils"
+  region: "us-east-1"
+  readypath: "/minio/health/ready"
 
 log:
   level: "debug"

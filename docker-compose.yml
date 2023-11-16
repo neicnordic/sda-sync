@@ -27,7 +27,7 @@ services:
       - "15672:15672"
       - "5672:5672"
     healthcheck:
-      test: [ "CMD", "bash", "-c", "rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms"]
+      test: ["CMD", "bash", "-c", "rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms"]
       interval: 5s
       timeout: 120s
       retries: 10
@@ -42,12 +42,7 @@ services:
       - MINIO_SERVER_URL=http://127.0.0.1:9000
     healthcheck:
       test:
-        [
-          "CMD",
-          "curl",
-          "-fqI",
-          "http://localhost:9000/minio/health/live"
-        ]
+        ["CMD", "curl", "-fqI", "http://localhost:9000/minio/health/live"]
       interval: 5s
       timeout: 20s
       retries: 10
@@ -86,28 +81,7 @@ services:
     restart: always
     environment:
       - LOG_LEVEL=debug
-      - INBOX_URL=http://s3
-      - INBOX_ACCESSKEY=access
-      - INBOX_SECRETKEY=secretkey
-      - INBOX_BUCKET=inbox
-      - INBOX_REGION=us-east-1
-      - INBOX_READYPATH=/minio/health/ready
-      - BROKER_HOST=rabbitmq
-      - BROKER_USER=test
-      - BROKER_PASSWORD=test
-      - BROKER_PORT=5672
-      - BROKER_VHOST=sda
-      - BROKER_EXCHANGE=sda
       - BROKER_ROUTINGKEY=inbox
-      - BROKER_SSL=false
-      - BROKER_CLIENTCERT=/certs/client.crt
-      - BROKER_CLIENTKEY=/certs/client.key
-      - BROKER_VERIFYPEER=false
-      - DB_PASSWORD=rootpasswd
-      - DB_USER=postgres
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_SSLMODE=disable
       - SERVER_JWTPUBKEYPATH=/keys/
       - SERVER_JWTPUBKEYURL=https://login.elixir-czech.org/oidc/jwk
       - LOG_FORMAT=json
@@ -131,22 +105,13 @@ services:
       bootstrap:
         condition: service_started
     environment:
-      - ARCHIVE_TYPE=s3
-      - ARCHIVE_URL=http://s3
-      - BROKER_EXCHANGE=sda
-      - BROKER_HOST=rabbitmq
       - BROKER_QUEUE=ingest
       - BROKER_ROUTINGKEY=archived
-      - BROKER_ROUTINGERROR=error
-      - DB_HOST=postgres
-      - INBOX_TYPE=s3
-      - INBOX_URL=http://s3
     image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
     command: [ sda-ingest ]
     volumes:
       - ./config.yaml:/config.yaml
       - keys:/keys
-      - archive:/tmp
     restart: always
 
   verify:
@@ -162,20 +127,11 @@ services:
       s3:
         condition: service_started
     environment:
-      - ARCHIVE_URL=http://s3
-      - ARCHIVE_TYPE=s3
-      - BROKER_EXCHANGE=sda
-      - BROKER_HOST=rabbitmq
       - BROKER_QUEUE=archived
       - BROKER_ROUTINGKEY=verified
-      - BROKER_ROUTINGERROR=error
-      - DB_HOST=postgres
-      - INBOX_TYPE=s3
-      - INBOX_URL=http://s3
     volumes:
       - ./config.yaml:/config.yaml
       - keys:/keys
-      - archive:/tmp
     restart: always
 
   finalize:
@@ -189,12 +145,8 @@ services:
       rabbitmq:
         condition: service_healthy
     environment:
-      - BROKER_EXCHANGE=sda
-      - BROKER_HOST=rabbitmq
       - BROKER_QUEUE=accession
       - BROKER_ROUTINGKEY=completed
-      - BROKER_ROUTINGERROR=error
-      - DB_HOST=postgres
     volumes:
       - ./config.yaml:/config.yaml
       - keys:/keys
@@ -213,16 +165,10 @@ services:
       s3:
         condition: service_started
     environment:
-      - ARCHIVE_TYPE=s3
-      - ARCHIVE_URL=http://s3
-      - BROKER_EXCHANGE=sda
-      - BROKER_HOST=rabbitmq
       - BROKER_QUEUE=mapping_stream
-      - DB_HOST=postgres
     volumes:
       - ./config.yaml:/config.yaml
       - keys:/keys
-      - archive:/tmp
     restart: always
 
   sync-api:
@@ -234,7 +180,6 @@ services:
       rabbitmq:
         condition: service_healthy
     environment:
-      - BROKER_EXCHANGE=sda
       - SYNC_API_INGESTROUTING=ingest
       - SYNC_API_ACCESSIONROUTING=accession
       - SYNC_API_MAPPINGROUTING=mappings
@@ -255,11 +200,7 @@ services:
       rabbitmq:
         condition: service_healthy
     environment:
-      - BROKER_EXCHANGE=sda
-      - BROKER_HOST=rabbitmq
       - BROKER_QUEUE=mappings
-      - BROKER_ROUTINGERROR=error
-      - DB_HOST=postgres
     volumes:
       - ./config.yaml:/config.yaml
       - keys:/keys
@@ -278,7 +219,7 @@ services:
       - $PWD/scripts/bootstrap.sh:/bin/bootstrap.sh
       - keys:/keys
 
-# Finnish implementation
+# Finnish implementation (assumming an s3 inbox)
   postgresfin:
     profiles: ["sda-finland"]
     container_name: postgresfin
@@ -303,7 +244,6 @@ services:
      - RABBITMQ_DEFAULT_PASS=test
      - RABBITMQ_DEFAULT_USER=test
      - MQ_VHOST=sda
-     - NOTLS=true
     ports:
       - "15674:15672"
       - "5674:5672"
@@ -361,22 +301,16 @@ services:
       bootstrapfin:
         condition: service_started
     environment:
-      - ARCHIVE_TYPE=s3
-      - ARCHIVE_URL=http://s3fin
-      - BROKER_EXCHANGE=sda
-      - BROKER_HOST=rabbitmqfin
       - BROKER_QUEUE=ingest
       - BROKER_ROUTINGKEY=archived
-      - BROKER_ROUTINGERROR=error
-      - DB_HOST=postgresfin
-      - INBOX_TYPE=s3
-      - INBOX_URL=http://s3fin
     image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
     command: [ sda-ingest ]
     volumes:
       - ./configfin.yaml:/config.yaml
       - keys:/keys
-      - archivefin:/tmp
+    # uncomment if using POSIX filesystem
+      # - inboxfin:/tmp
+      # - archivefin:/tmp
     restart: always
 
   verifyfin:
@@ -391,21 +325,15 @@ services:
       s3fin:
         condition: service_started
     environment:
-      - ARCHIVE_URL=http://s3fin
-      - ARCHIVE_TYPE=s3
-      - BROKER_EXCHANGE=sda
-      - BROKER_HOST=rabbitmqfin
       - BROKER_QUEUE=archived
       - BROKER_ROUTINGKEY=verified
-      - BROKER_ROUTINGERROR=error
-      - DB_HOST=postgresfin
-      - INBOX_TYPE=s3
-      - INBOX_URL=http://s3fin
     image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
     volumes:
       - ./configfin.yaml:/config.yaml
       - keys:/keys
-      - archivefin:/tmp
+    # uncomment if using POSIX filesystem
+      # - inboxfin:/tmp
+      # - archivefin:/tmp
     restart: always
 
   finalizefin:
@@ -418,12 +346,8 @@ services:
       rabbitmqfin:
         condition: service_healthy
     environment:
-      - BROKER_EXCHANGE=sda
-      - BROKER_HOST=rabbitmqfin
       - BROKER_QUEUE=accession
       - BROKER_ROUTINGKEY=completed
-      - BROKER_ROUTINGERROR=error
-      - DB_HOST=postgresfin
     image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
     volumes:
       - ./configfin.yaml:/config.yaml
@@ -443,16 +367,12 @@ services:
       s3fin:
         condition: service_started
     environment:
-      - ARCHIVE_TYPE=s3
-      - ARCHIVE_URL=http://s3fin
-      - BROKER_EXCHANGE=sda
-      - BROKER_HOST=rabbitmqfin
       - BROKER_QUEUE=mapping_stream
-      - DB_HOST=postgresfin
     volumes:
       - ./configfin.yaml:/config.yaml
       - keys:/keys
-      - archivefin:/tmp
+    # uncomment if using POSIX filesystem
+      # - archivefin:/tmp
     restart: always
 
   sync-apifin:
@@ -464,7 +384,6 @@ services:
       rabbitmqfin:
         condition: service_healthy
     environment:
-      - BROKER_EXCHANGE=sda
       - SYNC_API_INGESTROUTING=ingest
       - SYNC_API_ACCESSIONROUTING=accession
       - SYNC_API_MAPPINGROUTING=mappings
@@ -484,11 +403,7 @@ services:
       rabbitmqfin:
         condition: service_healthy
     environment:
-      - BROKER_EXCHANGE=sda
-      - BROKER_HOST=rabbitmqfin
       - BROKER_QUEUE=mappings
-      - BROKER_ROUTINGERROR=error
-      - DB_HOST=postgresfin
     image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
     volumes:
       - ./configfin.yaml:/config.yaml
@@ -507,10 +422,8 @@ services:
 
 volumes:
   keys:
+  dbdata:
+  dbdatafin:
+  inboxfin:
   archivefin:
   backupfin:
-  dbdatafin:
-  uploadsfin:
-  archive:
-  backup:
-  dbdata:
