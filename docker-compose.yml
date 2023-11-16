@@ -9,7 +9,7 @@ services:
       interval: 10s
       timeout: 2s
       retries: 6
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}-postgres
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}-postgres
     ports:
       - "5432:5432"
     volumes:
@@ -17,7 +17,7 @@ services:
 
   rabbitmq:
     profiles: ["sda-sweden"]
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}-rabbitmq
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}-rabbitmq
     container_name: rabbitmq
     environment:
      - RABBITMQ_DEFAULT_PASS=test
@@ -70,7 +70,7 @@ services:
 
   s3inbox:
     profiles: ["sda-sweden"]
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}
     command: [ sda-s3inbox ]
     container_name: s3inbox
     depends_on:
@@ -107,7 +107,7 @@ services:
     environment:
       - BROKER_QUEUE=ingest
       - BROKER_ROUTINGKEY=archived
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}
     command: [ sda-ingest ]
     volumes:
       - ./config.yaml:/config.yaml
@@ -116,7 +116,7 @@ services:
 
   verify:
     profiles: ["sda-sweden"]
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}
     command: [ sda-verify ]
     container_name: verify
     depends_on:
@@ -136,7 +136,7 @@ services:
 
   finalize:
     profiles: ["sda-sweden"]
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}
     command: [ sda-finalize ]
     container_name: finalize
     depends_on:
@@ -154,7 +154,7 @@ services:
 
   sync:
     profiles: ["sda-sweden"]
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}
     command: [ sda-sync ]
     container_name: sync
     depends_on:
@@ -173,7 +173,7 @@ services:
 
   sync-api:
     profiles: ["sda-sweden"]
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}
     command: [ sda-syncapi ]
     container_name: sync-api
     depends_on:
@@ -191,7 +191,7 @@ services:
 
   mapper:
     profiles: ["sda-sweden"]
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}
     command: [ sda-mapper ]
     container_name: mapper
     depends_on:
@@ -230,7 +230,7 @@ services:
       interval: 10s
       timeout: 2s
       retries: 6
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}-postgres
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}-postgres
     ports:
       - "5431:5432"
     volumes:
@@ -238,7 +238,7 @@ services:
 
   rabbitmqfin:
     profiles: ["sda-finland"]
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}-rabbitmq
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}-rabbitmq
     container_name: rabbitmqfin
     environment:
      - RABBITMQ_DEFAULT_PASS=test
@@ -303,7 +303,7 @@ services:
     environment:
       - BROKER_QUEUE=ingest
       - BROKER_ROUTINGKEY=archived
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}
     command: [ sda-ingest ]
     volumes:
       - ./configfin.yaml:/config.yaml
@@ -327,7 +327,7 @@ services:
     environment:
       - BROKER_QUEUE=archived
       - BROKER_ROUTINGKEY=verified
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}
     volumes:
       - ./configfin.yaml:/config.yaml
       - keys:/keys
@@ -348,7 +348,7 @@ services:
     environment:
       - BROKER_QUEUE=accession
       - BROKER_ROUTINGKEY=completed
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}
     volumes:
       - ./configfin.yaml:/config.yaml
       - keys:/keys
@@ -356,7 +356,7 @@ services:
 
   syncfin:
     profiles: ["sda-finland"]
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}
     command: [ sda-sync ]
     container_name: syncfin
     depends_on:
@@ -377,7 +377,7 @@ services:
 
   sync-apifin:
     profiles: ["sda-finland"]
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}
     command: [ sda-syncapi ]
     container_name: sync-apifin
     depends_on:
@@ -404,7 +404,7 @@ services:
         condition: service_healthy
     environment:
       - BROKER_QUEUE=mappings
-    image: ghcr.io/neicnordic/sensitive-data-archive:PR${PR_NUMBER}
+    image: ghcr.io/neicnordic/sensitive-data-archive:${TAG}
     volumes:
       - ./configfin.yaml:/config.yaml
       - keys:/keys
