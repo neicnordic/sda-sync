@@ -1,4 +1,29 @@
 services:
+  oidc:
+    profiles: ["sda-sweden"]
+    container_name: oidc
+    command:
+      - /bin/sh
+      - -c
+      - |
+        pip install -q --upgrade pip
+        pip install -q aiohttp Authlib joserfc requests
+        sh make_oidc_jwt.sh
+        python -u /oidc.py
+    healthcheck:
+      test: ["CMD", "python3", "-c", 'import requests; print(requests.get(url = "http://localhost:8080/jwk").text)']
+      interval: 10s
+      timeout: 2s
+      retries: 6
+    image: python:3.11-slim
+    ports:
+      - "8085:8080"
+    restart: always
+    volumes:
+      - ./scripts/oidc.py:/oidc.py
+      - ./scripts/sign_jwt.py:/sign_jwt.py
+      - ./scripts/make_oidc_jwt.sh:/make_oidc_jwt.sh
+      - shared:/shared
   postgres:
     profiles: ["sda-sweden"]
     container_name: postgres
@@ -74,16 +99,20 @@ services:
     command: [ sda-s3inbox ]
     container_name: s3inbox
     depends_on:
+      oidc:
+        condition: service_healthy
       s3:
         condition: service_started
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: always
     environment:
       - LOG_LEVEL=debug
       - BROKER_ROUTINGKEY=inbox
       - SERVER_JWTPUBKEYPATH=/keys/
-      - SERVER_JWTPUBKEYURL=https://login.elixir-czech.org/oidc/jwk
+      - SERVER_JWTPUBKEYURL=http://oidc:8080/jwk
       - LOG_FORMAT=json
     volumes:
       - ./config.yaml:/config.yaml
@@ -469,3 +498,4 @@ volumes:
   inboxfin:
   archivefin:
   backupfin:
+  shared:
