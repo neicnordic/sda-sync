@@ -47,6 +47,7 @@ That can be achieved using the `sda-admin` tool located at `dev_utils/tools`. Th
 ./sda-admin --mq-queue-prefix sda --user test_dummy.org ingest file.test.c4gh
 
 ```
+where here `test_dummy.org` is the `<USER-ELIXIR-ID>` taken from the `s3cfg` file.
 
 To check that the file has been ingested, run
 ```sh
@@ -56,7 +57,7 @@ You should be able to see the file in the list, similar to:
 ```sh
 file.test.c4gh
 ```
-To give an accession id to this file, run the following command, replacing the `<USER-ELIXIR-ID>` and the `<ACCESSION-ID>`:
+To give an accession id to this file, run the following command, replacing the `<ACCESSION-ID>`:
 ```sh
 ./sda-admin --mq-queue-prefix sda --user test_dummy.org accession <ACCESSION-ID> file.test.c4gh
 ```
