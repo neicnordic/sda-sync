@@ -1,6 +1,6 @@
 # SDA-sync
 
-The sda-sync is an integration created to solve the *data* syncing requirement in BigPicture. In this project, every data submission that takes place in a country's node must be *mirrored* in the other country's node. This means that both the submitted data files and their corresponding database identifiers (e.g. accession and dataset ID's) in one country's node should be replicated in the other country's node. This is achieved by syncing the data between the two nodes.
+The sda-sync is an integration created to solve the *data* syncing requirement in BigPicture. In this project, every data submission that takes place in a country's node must be *mirrored* in the other country's node. This means that both the submitted data files and their corresponding database identifiers (e.g. accession and dataset ID's) in one country's node should be replicated in the other country's node. This is achieved by syncing the data between the two nodes and then providing the relevant identifiers for use while ingesting.
 
 
 Specifically, the files (and datasets) that are uploaded in one node, are synced/backed up to the other node by making sure that the ingestion process that is run on both sides will result in accession and dataset IDs that are the same in both nodes. To achieve this, the sync integration utilizes the sensitive-data-archive `sync` and `sync-api` services.
@@ -32,27 +32,25 @@ There is a script under the `dev_utils` folder that cleans up the files folder a
 ```sh
 ./prepare.sh
 ```
-Note: This script should be run every time the services are re-run
-
-Login to LS-AAI and get the token that will be used for uploading data. For example, you can login [here](https://login.gdi.nbis), get the JWToken for the user and paste it in the `tools/proxyS3` file at the `<USER-TOKEN>` and replace the `<USER-ELIXIR-ID>` in the same file. If you are using the gdi url above, the name of the user should be on the top of the page. Copy this and replace the `@` character with `_`, then paste it in the `tools/proxyS3`.
+Note: This script should be run every time the services are re-run.
 
 The next step is to encrypt and upload the file in the `s3Inbox` of the Swedish node, using the sda-cli downloadable [here](https://github.com/NBISweden/sda-cli/releases) (and available under the `tools` folder), running:
 ```sh
-./sda-cli upload --config ../proxyS3 -encrypt-with-key ../keys/repo.pub.pem file.test
+./sda-cli upload --config ../s3cfg -encrypt-with-key ../keys/repo.pub.pem file.test
 ```
 
 ## Ingest the file
-Now that the file is uploaded in the S3 backend (that can be checked by logging into the minio via the browser at `localhost:9000` and making sure the file is in the inbox bucket), the ingestion process need to be initiated. 
+Now that the file is uploaded in the S3 backend (that can be checked by logging into the minio via the browser at `localhost:9000` and making sure the file is in the inbox bucket), the ingestion process need to be initiated.
 
-That can be achieved using the `sda-admin` tool located at `dev_utils/tools`. The script has detailed documentation, however, here are the main commands needed to ingest the specific file. First ingest the file running the following command, after replacing the `<USER-ELIXIR-ID>` with the value used in the previous step:
+That can be achieved using the `sda-admin` tool located at `dev_utils/tools`. The script has detailed documentation, however, here are the main commands needed to ingest the specific file. First ingest the file running the following command:
 ```sh
-./sda-admin --mq-queue-prefix sda --user <USER-ELIXIR-ID> ingest file.test.c4gh 
+./sda-admin --mq-queue-prefix sda --user test_dummy.org ingest file.test.c4gh
 
 ```
 
 To check that the file has been ingested, run
 ```sh
-./sda-admin --mq-queue-prefix sda --user <USER-ELIXIR-ID> accession
+./sda-admin --mq-queue-prefix sda --user test_dummy.org accession
 ```
 You should be able to see the file in the list, similar to:
 ```sh
@@ -60,13 +58,13 @@ file.test.c4gh
 ```
 To give an accession id to this file, run the following command, replacing the `<USER-ELIXIR-ID>` and the `<ACCESSION-ID>`:
 ```sh
-./sda-admin --mq-queue-prefix sda --user <USER-ELIXIR-ID> accession <ACCESSION-ID> file.test.c4gh
+./sda-admin --mq-queue-prefix sda --user test_dummy.org accession <ACCESSION-ID> file.test.c4gh
 ```
 
-Finally, to create a dataset including this file, run the following command, replacing the `<USER-ELIXIR-ID>` and the `<DATASET-ID>`.
+Finally, to create a dataset including this file, run the following command, replacing the `<DATASET-ID>`.
 **NOTE:** The `<DATASET-ID>` should have the `centerPrefix` defined under `config.yaml` and it should be minimum 11 characters long:
 ```sh
-./sda-admin --mq-queue-prefix sda --user `<USER-ELIXIR-ID>` dataset `<DATASET-ID>` file.test.c4gh
+./sda-admin --mq-queue-prefix sda --user test_dummy.org dataset <DATASET-ID> file.test.c4gh
 ```
 for example, if the `centerPrefix` value is `EGA`, the `<DATASET-ID>` should be of the format `EGA-<SOME-ID>`.
 
