@@ -34,7 +34,13 @@ There is a script under the `dev_utils` folder that cleans up the files folder a
 ```
 Note: This script should be run every time the services are re-run.
 
-The next step is to encrypt and upload the file in the `s3Inbox` of the Swedish node, using the sda-cli downloadable [here](https://github.com/NBISweden/sda-cli/releases) (and available under the `tools` folder), running:
+The next step is to encrypt and upload the file in the `s3Inbox` of the Swedish node, using the sda-cli downloadable [here](https://github.com/NBISweden/sda-cli/releases). For example, to get the linux release run the following commands from the `dev_utils/tools` folder:
+```sh
+wget -q https://github.com/NBISweden/sda-cli/releases/download/v0.1.0/sda-cli_.0.1.0_Linux_x86_64.tar.gz
+tar -xf sda-cli_.0.1.0_Linux_x86_64.tar.gz sda-cli && rm sda-cli_.0.1.0_Linux_x86_64.tar.gz
+```
+
+From the `dev_utils/tools` folder, run:
 ```sh
 ./sda-cli upload --config ../s3cfg -encrypt-with-key ../keys/repo.pub.pem file.test
 ```
